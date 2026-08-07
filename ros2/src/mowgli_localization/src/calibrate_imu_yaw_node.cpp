@@ -1223,6 +1223,14 @@ private:
                     nullptr);
     }
 
+    // Activate the sensor subs (esp. /gps/absolute_pose) BEFORE the RTK wait:
+    // gps_cb is the ONLY writer of gps_rtk_fixed_/gps_position_accuracy_, and it
+    // only runs while gps_sub_ (created here) is live. Activating after the wait
+    // meant the wait could never observe a fix — it always timed out with
+    // "No RTK-Fixed" even when RTK was Fixed, so the calibration never left this
+    // phase and the robot never moved. finish() deactivates on every exit path.
+    activate_sensor_subs();
+
     // ── (1) Wait for RTK-Fixed ──
     publish_status(
         DockStatus::PHASE_WAIT_RTK, 0.05f, 0.0f, true, false, 0, "waiting for RTK-Fixed");
@@ -1251,8 +1259,6 @@ private:
       }
       need_exit_recording = true;
     }
-
-    activate_sensor_subs();
 
     // ── (3) Straight reverse, collecting COG (+ IMU/odom accel if folding) ──
     const double x0 = latest_gps_x_.load();
